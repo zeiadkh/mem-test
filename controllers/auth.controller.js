@@ -1,5 +1,6 @@
 import prisma from '../db/prismaClient.js';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 
 async function createUser(data) {
     const newUser = await prisma.user.create({
@@ -46,14 +47,30 @@ const authController = {
         if(!bcrypt.compareSync(userData.password, user.password)) {
             return res.status(401).json({ message: 'Invalid password' });
         }
-        return res.status(200).json({ message: 'Login successful', user });
+        const token = jwt.sign({ id: user.id, email: user.email }, process.env.SECRET_KEY, { expiresIn: '1h' });
+        return res.status(200).json({ message: 'Login successful', user, token });
         }
         catch (error) {
             console.error(error);
             return res.status(500).json({ message:error.message });
         }
         // Login logic
+    },  
+    
+ isAuthenticated : (req, res, next) => {
+     console.log(req.headers.authorization, "fuch")
+        const token = req.headers.authorization
+        if (!token) {
+            return res.status(401).json({ message: 'No token provided' });
+        }
+        jwt.verify(token, process.env.SECRET_KEY, (err, decoded) => {
+            if (err) {
+                return res.status(401).json({ message: 'Invalid token' });
+            }
+            req.user = decoded;
+            next();
+        });
     }
-};
+    };
 
 export default authController;
